@@ -196,7 +196,7 @@ const ThreeJSVisualization: React.FC<{
   const sceneRef = useRef<any>(null);
   const rendererRef = useRef<any>(null);
   const cameraRef = useRef<any>(null);
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number>(0);
 
   useEffect(() => {
     if (!mountRef.current || typeof window === 'undefined') return;
