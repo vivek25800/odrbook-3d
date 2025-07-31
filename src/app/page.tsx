@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
-import { Play, Pause, RotateCcw, Filter, Settings, Moon, Sun } from 'lucide-react';
+import { Play, Pause, RotateCcw, Filter, Moon, Sun } from 'lucide-react';
 
 // Types
 interface OrderbookLevel {
@@ -23,17 +23,42 @@ interface Venue {
   enabled: boolean;
 }
 
-interface PressureZone {
-  price: number;
-  quantity: number;
-  intensity: number;
-  type: 'bid' | 'ask';
-}
-
 interface HistoricalData {
   timestamp: number;
   bids: OrderbookLevel[];
   asks: OrderbookLevel[];
+}
+
+// Three.js types
+interface ThreeScene {
+  background: any;
+  add: (object: any) => void;
+  remove: (object: any) => void;
+  children: any[];
+}
+
+interface ThreeCamera {
+  aspect: number;
+  position: {
+    set: (x: number, y: number, z: number) => void;
+    x: number;
+    y: number;
+    z: number;
+    multiplyScalar: (scalar: number) => void;
+  };
+  updateProjectionMatrix: () => void;
+  lookAt: (x: number, y: number, z: number) => void;
+}
+
+interface ThreeRenderer {
+  domElement: HTMLCanvasElement;
+  setSize: (width: number, height: number) => void;
+  render: (scene: ThreeScene, camera: ThreeCamera) => void;
+  dispose: () => void;
+  shadowMap: {
+    enabled: boolean;
+    type: any;
+  };
 }
 
 // Custom hooks
@@ -193,13 +218,16 @@ const ThreeJSVisualization: React.FC<{
   darkMode: boolean;
 }> = ({ orderbook, historicalData, isRotating, showPressureZones, darkMode }) => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<any>(null);
-  const rendererRef = useRef<any>(null);
-  const cameraRef = useRef<any>(null);
+  const sceneRef = useRef<ThreeScene | null>(null);
+  const rendererRef = useRef<ThreeRenderer>(null);
+  const cameraRef = useRef<ThreeCamera | null>(null);
   const frameRef = useRef<number>(0);
+
 
   useEffect(() => {
     if (!mountRef.current || typeof window === 'undefined') return;
+
+    const currentMount = mountRef.current;
 
     // Dynamically import Three.js to avoid SSR issues
     const initThreeJS = async () => {
@@ -210,16 +238,16 @@ const ThreeJSVisualization: React.FC<{
       scene.background = new THREE.Color(darkMode ? 0x1a1a2e : 0xf8f9fa);
       
       // Camera setup
-      const camera = new THREE.PerspectiveCamera(75, mountRef.current!.clientWidth / mountRef.current!.clientHeight, 0.1, 1000);
+      const camera = new THREE.PerspectiveCamera(75, currentMount.clientWidth / currentMount.clientHeight, 0.1, 1000);
       camera.position.set(25, 20, 25);
       camera.lookAt(0, 0, 0);
       
       // Renderer setup
       const renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(mountRef.current!.clientWidth, mountRef.current!.clientHeight);
+      renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
       renderer.shadowMap.enabled = true;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      mountRef.current!.appendChild(renderer.domElement);
+      currentMount.appendChild(renderer.domElement);
       
       // Lighting
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -358,10 +386,10 @@ const ThreeJSVisualization: React.FC<{
       
       // Handle resize
       const handleResize = () => {
-        if (!mountRef.current) return;
-        camera.aspect = mountRef.current.clientWidth / mountRef.current.clientHeight;
+        if (!currentMount) return;
+        camera.aspect = currentMount.clientWidth / currentMount.clientHeight;
         camera.updateProjectionMatrix();
-        renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
+        renderer.setSize(currentMount.clientWidth, currentMount.clientHeight);
       };
       
       window.addEventListener('resize', handleResize);
@@ -381,12 +409,12 @@ const ThreeJSVisualization: React.FC<{
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
-      if (rendererRef.current && mountRef.current?.contains(rendererRef.current.domElement)) {
-        mountRef.current.removeChild(rendererRef.current.domElement);
+      if (rendererRef.current && currentMount?.contains(rendererRef.current.domElement)) {
+        currentMount.removeChild(rendererRef.current.domElement);
         rendererRef.current.dispose();
       }
     };
-  }, [darkMode]);
+  }, [darkMode, isRotating]);
 
   // Update visualization when orderbook changes
   useEffect(() => {
@@ -394,7 +422,7 @@ const ThreeJSVisualization: React.FC<{
 
     const updateVisualization = async () => {
       const THREE = await import('three');
-      const scene = sceneRef.current;
+      const scene = sceneRef.current!;
       
       // Clear previous bars
       const barsToRemove = scene.children.filter((child: any) => child.userData?.isOrderbookBar);
@@ -415,19 +443,13 @@ const ThreeJSVisualization: React.FC<{
       );
       const maxQuantity = Math.max(...allQuantities, 1);
       
-      // Time range
-      const timeRange = {
-        min: Math.min(...historicalData.map(d => d.timestamp)),
-        max: Math.max(...historicalData.map(d => d.timestamp))
-      };
-      
       // Create 3D bars for each time snapshot
       historicalData.forEach((snapshot, timeIndex) => {
         const timeProgress = historicalData.length > 1 ? timeIndex / (historicalData.length - 1) : 0;
         const zPosition = (timeProgress * 40) - 20; // Time axis (Z)
         
         // Create bid bars (green)
-        snapshot.bids.slice(0, 20).forEach((bid, priceIndex) => {
+        snapshot.bids.slice(0, 20).forEach((bid) => {
           const xPosition = ((bid.price - priceRange.min) / (priceRange.max - priceRange.min) * 40) - 20; // Price axis (X)
           const yHeight = (bid.quantity / maxQuantity) * 15; // Quantity axis (Y)
           
@@ -453,7 +475,7 @@ const ThreeJSVisualization: React.FC<{
         });
         
         // Create ask bars (red)
-        snapshot.asks.slice(0, 20).forEach((ask, priceIndex) => {
+        snapshot.asks.slice(0, 20).forEach((ask) => {
           const xPosition = ((ask.price - priceRange.min) / (priceRange.max - priceRange.min) * 40) - 20; // Price axis (X)
           const yHeight = (ask.quantity / maxQuantity) * 15; // Quantity axis (Y)
           
@@ -522,10 +544,9 @@ const OrderbookDepthVisualizer: React.FC = () => {
   const [isRotating, setIsRotating] = useState(true);
   const [showPressureZones, setShowPressureZones] = useState(true);
   const [darkMode, setDarkMode] = useState(true);
-  const [timeRange, setTimeRange] = useState('1m');
   const [showFilters, setShowFilters] = useState(false);
   const [quantityThreshold, setQuantityThreshold] = useState(0.1);
-
+  
   const [venues, setVenues] = useState<Venue[]>([
     { id: 'binance', name: 'Binance', color: '#f0b90b', enabled: true },
     { id: 'okx', name: 'OKX', color: '#00d4aa', enabled: false },
@@ -697,21 +718,6 @@ const OrderbookDepthVisualizer: React.FC = () => {
             </div>
           </div>
 
-          {/* Time Range */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Time Range</h3>
-            <select
-              value={timeRange}
-              onChange={(e) => setTimeRange(e.target.value)}
-              className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2"
-            >
-              <option value="1m">1 Minute</option>
-              <option value="5m">5 Minutes</option>
-              <option value="15m">15 Minutes</option>
-              <option value="1h">1 Hour</option>
-            </select>
-          </div>
-
           {showFilters && (
             <div>
               <h3 className="text-lg font-semibold mb-2">Filters</h3>
@@ -797,7 +803,7 @@ const OrderbookDepthVisualizer: React.FC = () => {
           
           {/* Loading overlay */}
           {!connected && (
-            <div className="absolute inset0 flex itemcenter justify-center bg-black bg-opacity-75">
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
                 <p className="text-white">Connecting to market data...</p>
