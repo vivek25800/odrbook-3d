@@ -29,12 +29,12 @@ interface HistoricalData {
   asks: OrderbookLevel[];
 }
 
-// Three.js types
+// Three.js types - properly typed instead of 'any'
 interface ThreeScene {
-  background: any;
-  add: (object: any) => void;
-  remove: (object: any) => void;
-  children: any[];
+  background: THREE.Color;
+  add: (object: THREE.Object3D) => void;
+  remove: (object: THREE.Object3D) => void;
+  children: THREE.Object3D[];
 }
 
 interface ThreeCamera {
@@ -57,7 +57,7 @@ interface ThreeRenderer {
   dispose: () => void;
   shadowMap: {
     enabled: boolean;
-    type: any;
+    type: THREE.ShadowMapType;
   };
 }
 
@@ -98,9 +98,9 @@ const useOrderbookWebSocket = (symbol: string = 'BTCUSDT') => {
         bids: initialOrderbook.bids.slice(0, 20),
         asks: initialOrderbook.asks.slice(0, 20)
       }]);
-    } catch (err) {
+    } catch (error) {
       setError('Failed to initialize orderbook');
-      console.error(err);
+      console.error(error);
     }
   }, [symbol]);
 
@@ -188,7 +188,7 @@ const useOrderbookWebSocket = (symbol: string = 'BTCUSDT') => {
       };
 
       wsRef.current = ws;
-    } catch (err) {
+    } catch (error) {
       setError('Failed to connect to WebSocket');
       setConnected(false);
     }
@@ -218,11 +218,10 @@ const ThreeJSVisualization: React.FC<{
   darkMode: boolean;
 }> = ({ orderbook, historicalData, isRotating, showPressureZones, darkMode }) => {
   const mountRef = useRef<HTMLDivElement>(null);
-  const sceneRef = useRef<ThreeScene | null>(null);
-  const rendererRef = useRef<ThreeRenderer>(null);
-  const cameraRef = useRef<ThreeCamera | null>(null);
+  const sceneRef = useRef<THREE.Scene | null>(null);
+  const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   const frameRef = useRef<number>(0);
-
 
   useEffect(() => {
     if (!mountRef.current || typeof window === 'undefined') return;
@@ -425,8 +424,8 @@ const ThreeJSVisualization: React.FC<{
       const scene = sceneRef.current!;
       
       // Clear previous bars
-      const barsToRemove = scene.children.filter((child: any) => child.userData?.isOrderbookBar);
-      barsToRemove.forEach((bar: any) => scene.remove(bar));
+      const barsToRemove = scene.children.filter((child: THREE.Object3D) => child.userData?.isOrderbookBar);
+      barsToRemove.forEach((bar: THREE.Object3D) => scene.remove(bar));
       
       // Get price range from current orderbook
       const allPrices = [...orderbook.bids, ...orderbook.asks].map(level => level.price);
