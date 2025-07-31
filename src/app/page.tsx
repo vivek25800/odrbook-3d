@@ -47,7 +47,7 @@ const useOrderbookWebSocket = (symbol: string = 'BTCUSDT') => {
 
   const initializeOrderbook = useCallback(async () => {
     try {
-      const response = await fetch(https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=100);
+      const response = await fetch(`https://api.binance.com/api/v3/depth?symbol=${symbol}&limit=100`);
       const data = await response.json();
       
       const initialOrderbook: OrderbookData = {
@@ -83,7 +83,7 @@ const useOrderbookWebSocket = (symbol: string = 'BTCUSDT') => {
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     try {
-      const ws = new WebSocket(wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@depth);
+      const ws = new WebSocket(`wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@depth`);
       
       ws.onopen = () => {
         setConnected(true);
@@ -560,12 +560,12 @@ const OrderbookDepthVisualizer: React.FC = () => {
   }, [orderbook]);
 
   return (
-    <div className={w-full h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'} overflow-hidden}>
+    <div className={`w-full h-screen ${darkMode ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'} overflow-hidden`}>
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-gray-700">
         <div className="flex items-center space-x-4">
           <h1 className="text-2xl font-bold">3D Orderbook Depth Visualizer</h1>
-          <div className={px-3 py-1 rounded-full text-sm ${connected ? 'bg-green-500' : 'bg-red-500'}}>
+          <div className={`px-3 py-1 rounded-full text-sm ${connected ? 'bg-green-500' : 'bg-red-500'}`}>
             {connected ? 'Connected' : 'Disconnected'}
           </div>
           {error && <div className="text-red-400 text-sm">{error}</div>}
@@ -810,7 +810,7 @@ const OrderbookDepthVisualizer: React.FC = () => {
             <div className="text-sm space-y-1">
               <div>Symbol: <span className="font-bold text-yellow-400">{symbol}</span></div>
               <div>Updates: <span className="font-bold text-green-400">{historicalData.length}</span></div>
-              <div>Status: <span className={font-bold ${connected ? 'text-green-400' : 'text-red-400'}}>
+              <div>Status: <span className={`font-bold ${connected ? 'text-green-400' : 'text-red-400'}`}>
                 {connected ? 'Live' : 'Disconnected'}
               </span></div>
             </div>
